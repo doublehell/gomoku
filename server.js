@@ -630,6 +630,9 @@ wss.on('connection', (ws, req) => {
                         name: name,
                         sessionToken: sessionToken
                     });
+
+                    // 更新觀眾列表
+                    broadcastSpectatorList();
                     break;
 
                 case 'join_queue':
@@ -737,6 +740,7 @@ wss.on('connection', (ws, req) => {
 
                     // 廣播更新
                     broadcastPlayerList();
+                    broadcastSpectatorList();
                     break;
 
                 case 'move':

@@ -642,7 +642,8 @@ wss.on('connection', (ws, req) => {
                     sendTo(ws, {
                         type: 'login_success',
                         name: name,
-                        sessionToken: sessionToken
+                        sessionToken: sessionToken,
+                        inQueue: false
                     });
 
                     // 更新觀眾列表
@@ -702,11 +703,15 @@ wss.on('connection', (ws, req) => {
 
                     console.log(`玩家 ${session.name} session 恢復成功`);
 
+                    // 檢查是否在排隊中
+                    const isInQueue = player.status === 'queue';
+
                     sendTo(ws, {
                         type: 'login_success',
                         name: session.name,
                         sessionToken: token,
-                        restored: true
+                        restored: true,
+                        inQueue: isInQueue
                     });
 
                     // 如果在排隊中，加入排隊

@@ -708,6 +708,12 @@
                         localStorage.setItem('gomoku_session', msg.sessionToken);
                     }
 
+                    // 更新自己的排隊狀態
+                    if (msg.inQueue !== undefined) {
+                        isInQueue = msg.inQueue;
+                        updateButtons();
+                    }
+
                     // 如果是恢復的 session，維持遊戲狀態
                     if (msg.restored && msg.playerColor) {
                         myColor = msg.playerColor;

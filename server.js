@@ -850,6 +850,13 @@ wss.on('connection', (ws, req) => {
                 sendTo(currentGame.players[winnerIndex], {
                     type: 'opponent_left'
                 });
+
+                // 獲勝的玩家維持排隊狀態
+                const winnerWs = currentGame.players[winnerIndex];
+                if (!matchmakingQueue.includes(winnerWs)) {
+                    matchmakingQueue.push(winnerWs);
+                }
+                updatePlayerStatus(winnerWs, 'queue', null);
             }
 
             // 通知觀眾
@@ -865,6 +872,10 @@ wss.on('connection', (ws, req) => {
             if (timeSyncTimer) clearInterval(timeSyncTimer);
 
             currentGame = null;
+
+            // 廣播更新
+            broadcastPlayerList();
+            broadcastSpectatorList();
 
             // 嘗試重新配對
             checkMatchmaking();

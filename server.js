@@ -657,10 +657,9 @@ wss.on('connection', (ws, req) => {
                         // 恢復遊戲狀態
                         const playerIndex = currentGame.players.indexOf(ws);
                         if (playerIndex === -1) {
-                            // 玩家不在遊戲中，重新加入
-                            // 這是特殊情況，讓玩家重新排隊
+                            // 玩家不在遊戲中，維持等待狀態讓玩家手動參戰
                             player.status = 'waiting';
-                            addToMatchmaking(ws);
+                            player.gameId = null;
                         } else {
                             // 通知玩家恢復遊戲
                             const color = playerIndex === 0 ? BLACK : WHITE;
@@ -689,9 +688,9 @@ wss.on('connection', (ws, req) => {
                             restored: true
                         });
                     } else {
-                        // 沒有遊戲狀態，加入排隊
+                        // 沒有遊戲狀態，維持等待狀態讓玩家手動參戰
                         player.status = 'waiting';
-                        addToMatchmaking(ws);
+                        player.gameId = null;
                     }
 
                     // 廣播更新

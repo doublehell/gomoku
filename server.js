@@ -478,10 +478,17 @@ function scheduleNextMatch() {
 
     const game = currentGame;
 
-    // 設定玩家為 waiting 狀態 (等待重新點擊參戰)
+    // 遊戲結束後，將玩家加入排隊（自動進入下一輪配對）
     if (game && game.players) {
         game.players.forEach(p => {
-            updatePlayerStatus(p, 'waiting', null);
+            const player = players.get(p);
+            if (player) {
+                // 維持排隊狀態，等待自動配對
+                if (!matchmakingQueue.includes(p)) {
+                    matchmakingQueue.push(p);
+                }
+                updatePlayerStatus(p, 'queue', null);
+            }
         });
     }
 

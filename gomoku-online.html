@@ -147,6 +147,38 @@
             margin-top: 10px;
         }
 
+        .join-btn {
+            margin-top: 15px;
+            padding: 12px 40px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #4caf50, #2e7d32);
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .join-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .join-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .join-btn.cancel {
+            background: linear-gradient(135deg, #f44336, #c62828);
+        }
+
+        .join-btn.cancel:hover {
+            box-shadow: 0 5px 20px rgba(244, 67, 54, 0.4);
+        }
+
         .countdown-overlay {
             position: fixed;
             top: 0;
@@ -498,9 +530,11 @@
             <div class="game-section">
                 <!-- 遊戲狀態 -->
                 <div class="game-status waiting" id="gameStatus">
-                    <div id="statusText">等待配對中...</div>
+                    <div id="statusText">請點擊下方按鈕參戰</div>
                     <div class="queue-status" id="queueStatus"></div>
                     <div class="timer-display" id="timerDisplay"></div>
+                    <button id="joinBtn" class="join-btn">我要參戰</button>
+                    <button id="cancelBtn" class="join-btn cancel" style="display:none;">取消參戰</button>
                 </div>
 
                 <!-- 玩家資訊 -->
@@ -598,6 +632,8 @@
         const resultText = document.getElementById('resultText');
         const resultReason = document.getElementById('resultReason');
         const resultStone = document.getElementById('resultStone');
+        const joinBtn = document.getElementById('joinBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
 
         // 連接 WebSocket
         function connect() {
@@ -663,10 +699,16 @@
 
                 case 'queue_status':
                     if (msg.count > 0) {
-                        queueStatus.textContent = `排隊人數: ${msg.count} 人`;
+                        queueStatus.textContent = `等待參戰人數: ${msg.count} 人`;
                     } else {
-                        queueStatus.textContent = '';
+                        queueStatus.textContent = '請點擊「我要參戰」按鈕';
                     }
+                    updateButtons();
+                    break;
+
+                case 'match_waiting':
+                    queueStatus.textContent = msg.message;
+                    updateButtons();
                     break;
 
                 case 'player_list':
@@ -682,6 +724,8 @@
                     renderBoard();
                     gameStatus.className = 'game-status playing';
                     statusText.textContent = '對戰中！';
+                    joinBtn.style.display = 'none';
+                    cancelBtn.style.display = 'none';
                     break;
 
                 case 'spectate':
@@ -692,6 +736,8 @@
                     renderBoardSpectator();
                     gameStatus.className = 'game-status spectator';
                     statusText.textContent = msg.restored ? '觀戰中 (已恢復)' : '觀戰中';
+                    joinBtn.style.display = 'none';
+                    cancelBtn.style.display = 'none';
                     break;
 
                 case 'move':
@@ -969,6 +1015,37 @@
         chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendChat();
         });
+
+        // 參戰按鈕
+        joinBtn.addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'join_queue' }));
+            }
+        });
+
+        // 取消參戰按鈕
+        cancelBtn.addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'leave_queue' }));
+            }
+        });
+
+        // 更新按鈕狀態
+        function updateButtons() {
+            if (isPlaying || isSpectator) {
+                joinBtn.style.display = 'none';
+                cancelBtn.style.display = 'none';
+            } else {
+                // 檢查是否在排隊中 (透過 queueStatus 判斷)
+                if (queueStatus.textContent.includes('等待參戰人數')) {
+                    joinBtn.style.display = 'none';
+                    cancelBtn.style.display = 'inline-block';
+                } else {
+                    joinBtn.style.display = 'inline-block';
+                    cancelBtn.style.display = 'none';
+                }
+            }
+        }
 
         // 初始化
         connect();

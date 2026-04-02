@@ -128,7 +128,7 @@ function broadcastQueueStatus() {
     });
 }
 
-// 添加玩家到排隊
+// 添加玩家到排隊 (手動點擊參戰)
 function addToMatchmaking(ws) {
     const player = players.get(ws);
     if (!player || player.status !== 'waiting') return;
@@ -141,10 +141,22 @@ function addToMatchmaking(ws) {
     broadcastQueueStatus();
     broadcastPlayerList();
 
-    console.log(`玩家 ${player.name} 加入排隊，當前排隊人數: ${matchmakingQueue.length}`);
+    console.log(`玩家 ${player.name} 點擊參戰，當前排隊人數: ${matchmakingQueue.length}`);
 
     // 嘗試配對
     checkMatchmaking();
+}
+
+// 玩家取消參戰
+function leaveMatchmaking(ws) {
+    const player = players.get(ws);
+    if (!player || player.status !== 'queue') return;
+
+    removeFromMatchmaking(ws);
+    player.status = 'waiting';
+    broadcastPlayerList();
+
+    console.log(`玩家 ${player.name} 取消參戰`);
 }
 
 // 從排隊移除
@@ -376,56 +388,53 @@ function endGame(winnerIndex, reason) {
     scheduleNextMatch();
 }
 
-// 5秒後重新配對
+// 遊戲結束後重新配對
 function scheduleNextMatch() {
-    if (countdownTimer) clearTimeout(countdownTimer);
+    if (countdownTimer) clearInterval(countdownTimer);
 
-    let countdown = 5;
     const game = currentGame;
 
-    broadcastToGame({ type: 'countdown', count: countdown }, game);
-
-    countdownTimer = setInterval(() => {
-        countdown--;
-        if (countdown > 0) {
-            broadcastToGame({ type: 'countdown', count: countdown }, game);
-        } else {
-            clearInterval(countdownTimer);
-            countdownTimer = null;
-
-            // 從觀眾中隨機抓2人
-            const spectators = game.spectators.filter(s => s.readyState === WebSocket.OPEN);
-
-            if (spectators.length >= 2) {
-                // 隨機抽取2個觀眾成為玩家
-                const indices = [];
-                while (indices.length < 2) {
-                    const r = Math.floor(Math.random() * spectators.length);
-                    if (!indices.includes(r)) indices.push(r);
-                }
-
-                // 重新配對
-                const newPlayer1 = spectators[indices[0]];
-                const newPlayer2 = spectators[indices[1]];
-
-                const p1 = players.get(newPlayer1);
-                const p2 = players.get(newPlayer2);
-
-                // 從原遊戲移除
-                game.spectators = game.spectators.filter(s => !indices.includes(game.spectators.indexOf(s)));
-
-                // 加入新排隊
-                matchmakingQueue.push(newPlayer1);
-                matchmakingQueue.push(newPlayer2);
+    // 設定玩家為 waiting 狀態 (等待重新點擊參戰)
+    if (game && game.players) {
+        game.players.forEach(p => {
+            const player = players.get(p);
+            if (player) {
+                player.status = 'waiting';
+                player.gameId = null;
             }
+        });
+    }
 
-            // 清理當前遊戲
-            currentGame = null;
+    // 廣播遊戲結束，清理遊戲
+    currentGame = null;
+    broadcastPlayerList();
 
-            // 嘗試配對
-            checkMatchmaking();
-        }
-    }, 1000);
+    // 檢查是否有足夠人數參戰
+    if (matchmakingQueue.length >= 2) {
+        // 有足夠人數，開始倒數
+        let countdown = 5;
+
+        broadcastToAll({ type: 'countdown', count: countdown });
+
+        countdownTimer = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+                broadcastToAll({ type: 'countdown', count: countdown });
+            } else {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+                checkMatchmaking();
+            }
+        }, 1000);
+    } else {
+        // 人數不足，廣播等待
+        broadcastToAll({
+            type: 'match_waiting',
+            message: matchmakingQueue.length > 0
+                ? `等待更多玩家參戰... (${matchmakingQueue.length}/2)`
+                : '請點擊「我要參戰」按鈕開始配對'
+        });
+    }
 }
 
 // 檢查勝利
@@ -534,9 +543,16 @@ wss.on('connection', (ws) => {
                         name: name,
                         sessionToken: sessionToken
                     });
+                    break;
 
-                    // 自動加入排隊
+                case 'join_queue':
+                    // 玩家點擊參戰
                     addToMatchmaking(ws);
+                    break;
+
+                case 'leave_queue':
+                    // 玩家取消參戰
+                    leaveMatchmaking(ws);
                     break;
 
                 case 'restore_session':

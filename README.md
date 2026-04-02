@@ -10,8 +10,8 @@
 
 ## 功能特色
 
-- 🎮 **自動配對** - 玩家自動排隊，系統隨機配對2人對戰
-- 👀 **觀眾模式** - 未配對的玩家自動成為觀眾，即時觀戰
+- 🎮 **手動參戰** - 點擊「我要參戰」按鈕開始配對
+- 👀 **觀眾模式** - 未參戰的玩家自動成為觀眾，即時觀戰
 - ⏱️ **計時系統** - 60秒未下棋自動判負
 - 💬 **即時聊天** - 全服玩家即時聊天
 - 🔄 **Session 保持** - 重新整理維持登入狀態
@@ -55,10 +55,10 @@ kubectl get pods -l app=gomoku
 ## 遊戲說明
 
 1. 開啟網頁，輸入暱稱 (2-20字)
-2. 系統自動將你加入排隊
-3. 配對成功後開始對戰
-4. 五子連珠獲勝
-5. 遊戲結束後5秒自動重新配對
+2. 點擊「我要參戰」按鈕
+3. 湊滿2人後開始5秒倒數配對
+4. 對戰開始，五子連珠獲勝
+5. 遊戲結束後需再次點擊參戰
 
 ## 架構設計
 
@@ -93,6 +93,8 @@ kubectl get pods -l app=gomoku
 |------|------|------|
 | `login` | `{name: string}` | 玩家登入 |
 | `restore_session` | `{sessionToken: string}` | 恢復 session |
+| `join_queue` | - | 點擊參戰 |
+| `leave_queue` | - | 取消參戰 |
 | `move` | `{row: number, col: number}` | 下棋 |
 | `chat` | `{message: string}` | 發送聊天 |
 
@@ -101,7 +103,8 @@ kubectl get pods -l app=gomoku
 | 訊息 | 參數 | 說明 |
 |------|------|------|
 | `login_success` | `{name, sessionToken}` | 登入成功 |
-| `queue_status` | `{count: number}` | 排隊人數 |
+| `queue_status` | `{count: number}` | 參戰人數 |
+| `match_waiting` | `{message: string}` | 等待配對訊息 |
 | `player_list` | `{players: [{name, status}]}` | 玩家名單 |
 | `match_start` | `{playerColor, opponentName, board}` | 對戰開始 |
 | `spectate` | `{players, board}` | 變成觀眾 |

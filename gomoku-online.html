@@ -351,6 +351,26 @@
             border-bottom: none;
         }
 
+        #spectator-list li {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+
+        #spectator-list .game-info {
+            color: #4fc3f7;
+            font-weight: bold;
+            font-size: 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
+
+        #spectator-list .no-spectators {
+            color: rgba(255, 255, 255, 0.4);
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
         .status-badge {
             font-size: 0.7rem;
             padding: 2px 6px;
@@ -559,9 +579,13 @@
 
             <!-- 觀眾列表 -->
             <div class="spectators-panel">
-                <h3>👥 觀眾名單</h3>
+                <h3>👥 玩家列表</h3>
                 <ul class="player-list" id="playerList">
                     <!-- 玩家列表會動態生成 -->
+                </ul>
+                <h3 style="margin-top: 15px;">👀 觀眾</h3>
+                <ul class="player-list" id="spectator-list">
+                    <!-- 觀眾列表會動態生成 -->
                 </ul>
             </div>
         </div>
@@ -715,6 +739,10 @@
                     updatePlayerList(msg.players);
                     break;
 
+                case 'spectator_list':
+                    updateSpectatorList(msg.spectators, msg.players);
+                    break;
+
                 case 'match_start':
                     isSpectator = false;
                     isPlaying = true;
@@ -821,6 +849,36 @@
                 `;
                 playerList.appendChild(li);
             });
+        }
+
+        // 更新觀眾名單 (獨立顯示)
+        function updateSpectatorList(spectators, players) {
+            const spectatorListEl = document.getElementById('spectator-list');
+            if (!spectatorListEl) return;
+
+            spectatorListEl.innerHTML = '';
+
+            // 如果有對戰中的玩家，顯示對戰資訊
+            if (players && players.length === 2) {
+                const gameInfo = document.createElement('li');
+                gameInfo.className = 'game-info';
+                gameInfo.innerHTML = `<span>🎮 ${players[0]} vs ${players[1]}</span>`;
+                spectatorListEl.appendChild(gameInfo);
+            }
+
+            // 顯示觀眾列表
+            if (spectators && spectators.length > 0) {
+                spectators.forEach(name => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>👀 ${name}</span>`;
+                    spectatorListEl.appendChild(li);
+                });
+            } else {
+                const li = document.createElement('li');
+                li.className = 'no-spectators';
+                li.textContent = '尚無觀眾';
+                spectatorListEl.appendChild(li);
+            }
         }
 
         // 更新遊戲 UI

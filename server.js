@@ -93,6 +93,50 @@ const sessions = new Map(); // sessionToken -> { name, status, gameId }
 // 排隊中的玩家
 const matchmakingQueue = []; // Array of ws
 
+// 更新 player 狀態時同步更新 session
+function updatePlayerStatus(ws, newStatus, newGameId = null) {
+    const player = players.get(ws);
+    if (!player) return;
+
+    player.status = newStatus;
+    if (newGameId !== null) {
+        player.gameId = newGameId;
+    }
+
+    // 同步更新 session
+    if (player.sessionToken) {
+        const session = sessions.get(player.sessionToken);
+        if (session) {
+            session.status = newStatus;
+            session.gameId = newGameId;
+        }
+    }
+}
+
+// 廣播觀眾名單
+function broadcastSpectatorList() {
+    if (!currentGame) {
+        broadcastToAll({ type: 'spectator_list', spectators: [] });
+        return;
+    }
+
+    const spectatorNames = [];
+    if (currentGame.spectators) {
+        currentGame.spectators.forEach(spectator => {
+            const player = players.get(spectator);
+            if (player && player.name) {
+                spectatorNames.push(player.name);
+            }
+        });
+    }
+
+    broadcastToAll({
+        type: 'spectator_list',
+        spectators: spectatorNames,
+        players: currentGame.playerNames
+    });
+}
+
 // 當前對戰
 let currentGame = null;
 
@@ -176,9 +220,10 @@ function addToMatchmaking(ws) {
     if (!matchmakingQueue.includes(ws)) {
         matchmakingQueue.push(ws);
     }
-    player.status = 'queue';
+    updatePlayerStatus(ws, 'queue');
     broadcastQueueStatus();
     broadcastPlayerList();
+    broadcastSpectatorList();
 
     console.log(`玩家 ${player.name} 點擊參戰，當前排隊人數: ${matchmakingQueue.length}`);
 
@@ -192,8 +237,9 @@ function leaveMatchmaking(ws) {
     if (!player || player.status !== 'queue') return;
 
     removeFromMatchmaking(ws);
-    player.status = 'waiting';
+    updatePlayerStatus(ws, 'waiting');
     broadcastPlayerList();
+    broadcastSpectatorList();
 
     console.log(`玩家 ${player.name} 取消參戰`);
 }
@@ -253,10 +299,8 @@ function startMatch() {
     };
 
     currentGame = game;
-    p1.status = 'playing';
-    p1.gameId = game.id;
-    p2.status = 'playing';
-    p2.gameId = game.id;
+    updatePlayerStatus(player1, 'playing', game.id);
+    updatePlayerStatus(player2, 'playing', game.id);
 
     console.log(`遊戲 ${game.id} 開始: ${p1.name} vs ${p2.name}`);
 
@@ -283,6 +327,7 @@ function startMatch() {
     // 廣播排隊狀態
     broadcastQueueStatus();
     broadcastPlayerList();
+    broadcastSpectatorList();
 
     // 啟動計時器
     startGameTimer();
@@ -300,8 +345,7 @@ function broadcastSpectator(game) {
             matchmakingQueue.splice(idx, 1);
         }
 
-        player.status = 'spectating';
-        player.gameId = game.id;
+        updatePlayerStatus(ws, 'spectating', game.id);
 
         // 添加到遊戲的觀眾列表
         if (!game.spectators.includes(ws)) {
@@ -317,6 +361,7 @@ function broadcastSpectator(game) {
     });
     broadcastQueueStatus();
     broadcastPlayerList();
+    broadcastSpectatorList();
 }
 
 // 啟動遊戲計時器
@@ -436,17 +481,14 @@ function scheduleNextMatch() {
     // 設定玩家為 waiting 狀態 (等待重新點擊參戰)
     if (game && game.players) {
         game.players.forEach(p => {
-            const player = players.get(p);
-            if (player) {
-                player.status = 'waiting';
-                player.gameId = null;
-            }
+            updatePlayerStatus(p, 'waiting', null);
         });
     }
 
     // 廣播遊戲結束，清理遊戲
     currentGame = null;
     broadcastPlayerList();
+    broadcastSpectatorList();
 
     // 檢查是否有足夠人數參戰
     if (matchmakingQueue.length >= 2) {
@@ -568,7 +610,7 @@ wss.on('connection', (ws, req) => {
                     }
 
                     player.name = name;
-                    player.status = 'waiting';
+                    updatePlayerStatus(ws, 'waiting');
 
                     // 生成 session token
                     const sessionToken = generateSessionToken();
@@ -841,6 +883,7 @@ wss.on('connection', (ws, req) => {
 
         // 更新玩家列表
         broadcastPlayerList();
+        broadcastSpectatorList();
     });
 });
 

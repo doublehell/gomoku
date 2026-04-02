@@ -1,7 +1,7 @@
 const Session = require('./Session');
 const { generateSessionToken } = require('../utils/gameLogic');
 
-const SESSION_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 class SessionManager {
     constructor() {

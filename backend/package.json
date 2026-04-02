@@ -1,0 +1,16 @@
+{
+  "name": "gomoku-backend",
+  "version": "1.0.0",
+  "description": "五子棋連線對戰 - 伺服器",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

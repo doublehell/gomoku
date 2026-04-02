@@ -10,6 +10,7 @@ class Player {
         this.gameId = null;
         this.sessionToken = null;
         this.ip = ip;
+        this.loginTime = Date.now();
     }
 
     setName(name) {
@@ -44,7 +45,8 @@ class Player {
             name: this.name,
             status: this.status,
             gameId: this.gameId,
-            ip: this.ip
+            ip: this.ip,
+            loginTime: this.loginTime
         };
     }
 }

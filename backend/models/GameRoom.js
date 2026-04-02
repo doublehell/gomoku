@@ -12,14 +12,22 @@ class GameRoom {
     }
 
     addToQueue(player) {
-        if (player.status !== PlayerStatus.WAITING) return false;
+        // 將狀態改為 WAITING 才能加入排隊
+        if (player.status === PlayerStatus.SPECTATING) {
+            player.setStatus(PlayerStatus.WAITING);
+        }
+
+        if (player.status !== PlayerStatus.WAITING) {
+            console.log('[GameRoom] addToQueue failed - wrong status:', player.status)
+            return false;
+        }
 
         this.matchmakingQueue.add(player);
         player.setStatus(PlayerStatus.QUEUE);
+        this._updateSessionStatus(player);
 
-        this.gameServer.broadcastQueueStatus();
-        this.gameServer.broadcastPlayerList();
-        this.gameServer.broadcastSpectatorList();
+        // 廣播 lobby_state 給所有人
+        this.gameServer.broadcastLobbyState();
 
         this.gameServer.log(`玩家 ${player.name} 點擊參戰，當前排隊人數: ${this.matchmakingQueue.size}`);
 
@@ -32,14 +40,22 @@ class GameRoom {
         if (player.status !== PlayerStatus.QUEUE) return false;
 
         this.matchmakingQueue.delete(player);
-        player.setStatus(PlayerStatus.WAITING);
+        player.setStatus(PlayerStatus.SPECTATING);
+        this._updateSessionStatus(player);
 
-        this.gameServer.broadcastQueueStatus();
-        this.gameServer.broadcastPlayerList();
-        this.gameServer.broadcastSpectatorList();
+        // 廣播 lobby_state 給所有人
+        this.gameServer.broadcastLobbyState();
 
         this.gameServer.log(`玩家 ${player.name} 取消參戰`);
         return true;
+    }
+
+    /**
+     * Sync player status to session for session restoration
+     */
+    _updateSessionStatus(player) {
+        if (!player.sessionToken) return;
+        this.gameServer.sessionManager.updatePlayerStatus(player, player.status, player.gameId);
     }
 
     findMatch() {
@@ -76,8 +92,11 @@ class GameRoom {
 
         player1.setStatus(PlayerStatus.PLAYING);
         player1.setGameId(game.id);
+        this._updateSessionStatus(player1);
+
         player2.setStatus(PlayerStatus.PLAYING);
         player2.setGameId(game.id);
+        this._updateSessionStatus(player2);
 
         this.games.set(game.id, game);
 
@@ -103,10 +122,8 @@ class GameRoom {
         // Notify others as spectators
         this.broadcastSpectator(game);
 
-        // Broadcast status
-        this.gameServer.broadcastQueueStatus();
-        this.gameServer.broadcastPlayerList();
-        this.gameServer.broadcastSpectatorList();
+        // 廣播 lobby_state 給所有人
+        this.gameServer.broadcastLobbyState();
 
         // Start timer
         game.startTimer(Game.TIMEOUT_MS, () => this.handleTimeout(game));
@@ -124,6 +141,7 @@ class GameRoom {
 
             player.setStatus(PlayerStatus.SPECTATING);
             player.setGameId(game.id);
+            this._updateSessionStatus(player);
             game.addSpectator(player.ws);
 
             player.send({
@@ -224,20 +242,20 @@ class GameRoom {
             this.countdownTimer = null;
         }
 
-        // Set players back to waiting (spectator) status
+        // Set players back to spectator status
         game.players.forEach(player => {
             if (player && player.ws) {
-                player.setStatus(PlayerStatus.WAITING);
+                player.setStatus(PlayerStatus.SPECTATING);
                 player.setGameId(null);
+                this._updateSessionStatus(player);
             }
         });
 
         // Clear game
         this.games.delete(game.id);
 
-        this.gameServer.broadcastQueueStatus();
-        this.gameServer.broadcastPlayerList();
-        this.gameServer.broadcastSpectatorList();
+        // 廣播 lobby_state 給所有人
+        this.gameServer.broadcastLobbyState();
 
         // Notify players they are now in spectator mode
         game.players.forEach(player => {
@@ -309,8 +327,9 @@ class GameRoom {
                 // Notify winner and set to spectator status
                 if (winner && winner.ws && winner.ws.readyState === WebSocket.OPEN) {
                     winner.send({ type: 'opponent_left' });
-                    winner.setStatus(PlayerStatus.WAITING);
+                    winner.setStatus(PlayerStatus.SPECTATING);
                     winner.setGameId(null);
+                    this._updateSessionStatus(winner);
                 }
 
                 // Notify spectators

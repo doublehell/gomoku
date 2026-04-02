@@ -4,37 +4,49 @@
 - 即時連線對戰五子棋遊戲
 - Node.js + WebSocket
 - 25x25 棋盤，60秒計時
-- 支援 Docker / Kubernetes 部署
+- Docker 部署
 
 ## 技術棧
-- Runtime: Node.js 20.x
-- WebSocket: ws
-- 前端: 原生 HTML/CSS/JS
+- Backend: Node.js 20.x + ws
+- Frontend: 原生 HTML/CSS/JS
 
 ## 檔案結構
 ```
-├── server.js              # WebSocket 伺服器
-├── gomoku-online.html     # 客戶端頁面
-├── package.json
-├── Dockerfile
-├── k8s-deployment.yaml
+├── backend/                 # 後端服務
+│   ├── index.js            # 入口點
+│   ├── GameServer.js       # WebSocket 伺服器
+│   ├── models/             # 類別
+│   ├── enums/              # 列舉
+│   ├── utils/              # 工具函式
+│   ├── package.json
+│   └── Dockerfile
+│
+├── frontend/               # 前端頁面
+│   ├── gomoku-online.html # 客戶端頁面
+│   ├── package.json
+│   └── Dockerfile
+│
 ├── .dockerignore
 └── .gitignore
 ```
 
-## 近期更新 (2024-04)
-- Session 記憶體洩漏修復 (5分鐘過期)
-- 聊天訊息頻率限制 (1秒冷卻)
-- Path Traversal 防護
-- IP 位址記錄功能
-
 ## 部署命令
 ```bash
+# 後端
+cd backend && npm install
+npm start
+
+# 前端
+cd frontend && npm install
+npm start
+
 # Docker
-docker run -d -p 3000:3000 --name gomoku gomoku-online:latest
+docker run -d -p 3000:3000 --name gomoku-backend backend:latest
+docker run -d -p 8080:80 --name gomoku-frontend frontend:latest
 ```
 
 ## 重要筆記
 - 支援外部網路存取 (使用 window.location.host 動態連線)
 - 伺服器 console 輸出玩家連線 IP 和聊天紀錄
 - 資安: XSS 防護、Path Traversal 防護已完成
+- OOP 重構完成 - 使用類別管理狀態

@@ -25,6 +25,13 @@ setInterval(() => {
     });
 }, 60000); // 每分鐘檢查一次
 
+// 定期廣播狀態 (每5秒) - 確保所有客戶端狀態同步
+setInterval(() => {
+    broadcastQueueStatus();
+    broadcastPlayerList();
+    broadcastSpectatorList();
+}, 5000);
+
 // 創建 HTTP 伺服器提供靜態文件
 const server = http.createServer((req, res) => {
     // Health check for Kubernetes

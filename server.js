@@ -5,6 +5,26 @@ const WebSocket = require('ws');
 
 const PORT = 3000;
 
+// Session 過期時間 (5分鐘)
+const SESSION_EXPIRY_MS = 5 * 60 * 1000;
+
+// 聊天冷卻時間 (1秒)
+const CHAT_COOLDOWN_MS = 1000;
+
+// 追蹤每個客戶端的 last chat time
+const lastChatTime = new Map(); // ws -> timestamp
+
+// Session 過期清理定時器
+setInterval(() => {
+    const now = Date.now();
+    sessions.forEach((session, token) => {
+        if (session.expiresAt && now > session.expiresAt) {
+            sessions.delete(token);
+            console.log(`Session ${token} 過期清除`);
+        }
+    });
+}, 60000); // 每分鐘檢查一次
+
 // 創建 HTTP 伺服器提供靜態文件
 const server = http.createServer((req, res) => {
     // Health check for Kubernetes
@@ -14,7 +34,26 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    let filePath = req.url === '/' ? '/gomoku-online.html' : req.url;
+    // Path Traversal 防護: 驗證 URL 路徑
+    let urlPath = req.url.split('?')[0]; // 移除 query string
+    urlPath = decodeURIComponent(urlPath);
+
+    // 禁止 ../ 路徑穿越
+    if (urlPath.includes('..')) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+    }
+
+    // 限制只能存取允許的目錄
+    const normalizedPath = path.normalize(urlPath).replace(/^(\.\.[\/\\])+/, '');
+    if (normalizedPath.startsWith('/') || normalizedPath.match(/^[a-zA-Z]:/)) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+    }
+
+    let filePath = urlPath === '/' ? '/gomoku-online.html' : normalizedPath;
     filePath = path.join(__dirname, filePath);
 
     const extname = path.extname(filePath);
@@ -476,8 +515,13 @@ function generateSessionToken() {
 }
 
 // WebSocket 連接處理
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
     const playerId = Date.now() + Math.random();
+
+    // 取得客戶端 IP (支援 Proxy/Load Balancer)
+    const clientIP = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+        || req.socket.remoteAddress
+        || 'unknown';
 
     // 初始玩家狀態
     players.set(ws, {
@@ -485,10 +529,11 @@ wss.on('connection', (ws) => {
         name: null,
         status: 'connected', // connected, waiting, queue, playing, spectating
         gameId: null,
-        sessionToken: null
+        sessionToken: null,
+        ip: clientIP
     });
 
-    console.log(`玩家 ${playerId} 連線`);
+    console.log(`玩家 ${playerId} 連線, IP: ${clientIP}`);
 
     // 檢查 client 是否有 session token
     // 如果有，嘗試恢復 session
@@ -564,6 +609,16 @@ wss.on('connection', (ws) => {
                         sendTo(ws, { type: 'login_request' });
                         return;
                     }
+
+                    // 檢查 session 是否過期
+                    if (session.expiresAt && Date.now() > session.expiresAt) {
+                        sessions.delete(token);
+                        sendTo(ws, { type: 'login_request' });
+                        return;
+                    }
+
+                    // 清除過期時間，恢復 active session
+                    delete session.expiresAt;
 
                     // 檢查暱稱是否已被使用
                     let restoreNameTaken = false;
@@ -689,19 +744,32 @@ wss.on('connection', (ws) => {
                     break;
 
                 case 'chat':
-                    // 聊天訊息
+                    // 聊天訊息 (含頻率限制)
                     const chatMsg = (message.message || '').trim().substring(0, 200);
                     if (!chatMsg || !player.name) return;
+
+                    // 檢查冷卻時間
+                    const lastMsgTime = lastChatTime.get(ws) || 0;
+                    if (Date.now() - lastMsgTime < CHAT_COOLDOWN_MS) {
+                        sendTo(ws, { type: 'error', message: '發送太快了，請稍後再試' });
+                        return;
+                    }
+                    lastChatTime.set(ws, Date.now());
 
                     const now = new Date();
                     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
+                    // 廣播聊天訊息給所有人 (包含發送者 IP)
                     broadcastToAll({
                         type: 'chat_broadcast',
                         time: timeStr,
                         name: player.name,
-                        message: chatMsg
+                        message: chatMsg,
+                        ip: player.ip  // 供管理後台查看
                     });
+
+                    // 同時輸出到 server console
+                    console.log(`[聊天] ${player.name} (${player.ip}): ${chatMsg}`);
                     break;
             }
         } catch (e) {
@@ -758,6 +826,19 @@ wss.on('connection', (ws) => {
 
         // 移除玩家
         players.delete(ws);
+
+        // 清理 lastChatTime
+        lastChatTime.delete(ws);
+
+        // Session 記憶體洩漏修復: 設置過期時間而非立即刪除
+        // 保留 5 分鐘讓使用者可以重新整理頁面
+        if (player.sessionToken) {
+            const session = sessions.get(player.sessionToken);
+            if (session) {
+                session.expiresAt = Date.now() + SESSION_EXPIRY_MS;
+                console.log(`玩家 ${player.name} session 設置 ${SESSION_EXPIRY_MS / 60000} 分鐘後過期`);
+            }
+        }
 
         // 更新玩家列表
         broadcastPlayerList();

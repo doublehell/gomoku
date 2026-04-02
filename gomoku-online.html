@@ -723,10 +723,13 @@
                     break;
 
                 case 'queue_status':
-                    if (msg.count > 0) {
-                        queueStatus.textContent = `等待參戰人數: ${msg.count} 人`;
-                    } else {
-                        queueStatus.textContent = '請點擊「我要參戰」按鈕';
+                    // 只有在未游戏状态下才更新排队状态
+                    if (!isPlaying && !isSpectator) {
+                        if (msg.count > 0) {
+                            queueStatus.textContent = `等待參戰人數: ${msg.count} 人`;
+                        } else if (!isInQueue) {
+                            queueStatus.textContent = '請點擊「我要參戰」按鈕';
+                        }
                     }
                     updateButtons();
                     break;
@@ -774,6 +777,9 @@
                 case 'move':
                     board[msg.row][msg.col] = msg.player;
                     renderBoardWithLastMove(msg.row, msg.col);
+                    // 顯示輪到誰
+                    const isMyTurn = msg.currentPlayer === myColor;
+                    statusText.textContent = isMyTurn ? '輪到你了!' : '等候對手下棋';
                     break;
 
                 case 'time_sync':

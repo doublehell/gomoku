@@ -115,7 +115,8 @@ function updatePlayerStatus(ws, newStatus, newGameId = null) {
 
 // 廣播觀眾名單
 function broadcastSpectatorList() {
-    // 观众区显示: waiting (未按参战) + spectating (观战中)
+    // 观众区显示: waiting (未按参战) + 真正观眾 (spectating)
+    // 不显示正在对战的玩家（他们显示在玩家列表）
     const spectatorNames = [];
     const waitingNames = [];
 
@@ -124,32 +125,16 @@ function broadcastSpectatorList() {
         if (player && player.name) {
             if (player.status === 'waiting') {
                 waitingNames.push(player.name);
+            } else if (player.status === 'spectating') {
+                spectatorNames.push(player.name);
             }
         }
     });
 
-    // 如果有對戰，顯示對戰中的玩家 + 觀眾
-    if (currentGame) {
-        if (currentGame.playerNames) {
-            currentGame.playerNames.forEach(name => {
-                spectatorNames.push(name);
-            });
-        }
-        if (currentGame.spectators) {
-            currentGame.spectators.forEach(spectator => {
-                const player = players.get(spectator);
-                if (player && player.name) {
-                    spectatorNames.push(player.name);
-                }
-            });
-        }
-    }
-
     broadcastToAll({
         type: 'spectator_list',
         spectators: spectatorNames,
-        waiting: waitingNames,
-        players: currentGame ? currentGame.playerNames : []
+        waiting: waitingNames
     });
 }
 

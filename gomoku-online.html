@@ -744,7 +744,7 @@
                     break;
 
                 case 'spectator_list':
-                    updateSpectatorList(msg.spectators, msg.players);
+                    updateSpectatorList(msg.spectators, msg.waiting);
                     break;
 
                 case 'match_start':
@@ -866,35 +866,26 @@
         }
 
         // 更新觀眾名單 (獨立顯示)
-        function updateSpectatorList(spectators, players, waiting) {
+        function updateSpectatorList(spectators, waiting) {
             const spectatorListEl = document.getElementById('spectator-list');
             if (!spectatorListEl) return;
 
             spectatorListEl.innerHTML = '';
 
-            // 如果有對戰中的玩家，顯示對戰資訊
-            if (players && players.length === 2) {
-                const gameInfo = document.createElement('li');
-                gameInfo.className = 'game-info';
-                gameInfo.innerHTML = `<span>🎮 ${players[0]} vs ${players[1]}</span>`;
-                spectatorListEl.appendChild(gameInfo);
-
-                // 顯示觀眾列表
-                if (spectators && spectators.length > 0) {
-                    spectators.forEach(name => {
-                        const li = document.createElement('li');
-                        li.innerHTML = `<span>👀 ${name}</span>`;
-                        spectatorListEl.appendChild(li);
-                    });
-                }
+            // 顯示觀眾列表 (正在觀戰的玩家)
+            if (spectators && spectators.length > 0) {
+                spectators.forEach(name => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>👀 ${name}</span>`;
+                    spectatorListEl.appendChild(li);
+                });
             }
 
             // 顯示未參戰的等待玩家
             if (waiting && waiting.length > 0) {
                 if (spectatorListEl.children.length > 0) {
-                    // 如果有對戰，先加一個分隔線
+                    // 如果有觀眾，先加一個分隔線
                     const divider = document.createElement('li');
-                    divider.className = 'divider';
                     divider.style.borderTop = '1px solid rgba(255,255,255,0.2)';
                     divider.style.marginTop = '8px';
                     divider.style.paddingTop = '8px';

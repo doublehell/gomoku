@@ -756,7 +756,9 @@
                     updateGameUI(true, msg.opponentName);
                     renderBoard();
                     gameStatus.className = 'game-status playing';
-                    statusText.textContent = '對戰中！';
+                    // 顯示輪到誰
+                    const isMyTurnAtStart = msg.currentPlayer === myColor;
+                    statusText.textContent = isMyTurnAtStart ? '輪到你了!' : '等候對手下棋';
                     joinBtn.style.display = 'none';
                     cancelBtn.style.display = 'none';
                     break;
@@ -805,6 +807,7 @@
 
                 case 'game_end':
                     isInQueue = false;
+                    isSpectator = false;
                     showResultSpectator(msg.winner, msg.winnerName, msg.reason);
                     break;
 
@@ -1033,12 +1036,14 @@
             resultStone.className = `result-stone ${winner === BLACK ? 'black' : 'white'}`;
             resultOverlay.classList.add('show');
 
+            // 立即更新狀態
+            gameStatus.className = 'game-status waiting';
+            statusText.textContent = '等待配對中...';
+            timerDisplay.textContent = '';
+            queueStatus.textContent = '';
+
             setTimeout(() => {
                 resultOverlay.classList.remove('show');
-                gameStatus.className = 'game-status waiting';
-                statusText.textContent = '等待配對中...';
-                timerDisplay.textContent = '';
-                queueStatus.textContent = '';
             }, 3000);
         }
 
@@ -1049,6 +1054,10 @@
             resultReason.textContent = reason;
             resultStone.className = `result-stone ${winner === BLACK ? 'black' : 'white'}`;
             resultOverlay.classList.add('show');
+
+            // 立即更新狀態 (觀眾視角)
+            gameStatus.className = 'game-status waiting';
+            statusText.textContent = '等待配對中...';
 
             setTimeout(() => {
                 resultOverlay.classList.remove('show');
@@ -1063,11 +1072,13 @@
             resultStone.style.display = 'none';
             resultOverlay.classList.add('show');
 
+            // 立即更新狀態
+            gameStatus.className = 'game-status waiting';
+            statusText.textContent = '等待配對中...';
+
             setTimeout(() => {
                 resultOverlay.classList.remove('show');
                 resultStone.style.display = 'block';
-                gameStatus.className = 'game-status waiting';
-                statusText.textContent = '等待配對中...';
             }, 3000);
         }
 

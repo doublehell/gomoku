@@ -115,25 +115,41 @@ function updatePlayerStatus(ws, newStatus, newGameId = null) {
 
 // 廣播觀眾名單
 function broadcastSpectatorList() {
-    if (!currentGame) {
-        broadcastToAll({ type: 'spectator_list', spectators: [] });
-        return;
-    }
-
+    // 观众区显示: waiting (未按参战) + spectating (观战中)
     const spectatorNames = [];
-    if (currentGame.spectators) {
-        currentGame.spectators.forEach(spectator => {
-            const player = players.get(spectator);
-            if (player && player.name) {
-                spectatorNames.push(player.name);
+    const waitingNames = [];
+
+    wss.clients.forEach(client => {
+        const player = players.get(client);
+        if (player && player.name) {
+            if (player.status === 'waiting') {
+                waitingNames.push(player.name);
             }
-        });
+        }
+    });
+
+    // 如果有對戰，顯示對戰中的玩家 + 觀眾
+    if (currentGame) {
+        if (currentGame.playerNames) {
+            currentGame.playerNames.forEach(name => {
+                spectatorNames.push(name);
+            });
+        }
+        if (currentGame.spectators) {
+            currentGame.spectators.forEach(spectator => {
+                const player = players.get(spectator);
+                if (player && player.name) {
+                    spectatorNames.push(player.name);
+                }
+            });
+        }
     }
 
     broadcastToAll({
         type: 'spectator_list',
         spectators: spectatorNames,
-        players: currentGame.playerNames
+        waiting: waitingNames,
+        players: currentGame ? currentGame.playerNames : []
     });
 }
 
@@ -190,12 +206,11 @@ function broadcastPlayerList() {
     wss.clients.forEach(client => {
         const player = players.get(client);
         if (player && player.name) {
-            let status = 'waiting';
-            if (player.status === 'playing') {
-                status = 'playing';
-            } else if (player.status === 'spectating') {
-                status = 'spectating';
-            }
+            // 只显示 queue/playing 状态的玩家（已按下参战）
+            // waiting/spectating 不显示在玩家列表，会显示在观众区
+            if (player.status === 'waiting' || player.status === 'spectating') return;
+
+            let status = player.status; // queue, playing
             playerList.push({ name: player.name, status });
         }
     });

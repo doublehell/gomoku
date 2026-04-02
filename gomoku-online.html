@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋 - 連線對戰</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #e94560;
+            font-size: 2rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            letter-spacing: 4px;
+        }
+
+        /* 登入畫面 */
+        .login-screen {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .login-screen h2 {
+            color: #fff;
+            margin-bottom: 30px;
+        }
+
+        .login-screen input {
+            padding: 12px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 25px;
+            width: 200px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .login-screen button {
+            padding: 12px 40px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            background: linear-gradient(135deg, #e94560, #c73e54);
+            color: white;
+        }
+
+        .login-screen button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 大廳畫面 */
+        .lobby-screen {
+            display: none;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .lobby-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .lobby-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lobby-content {
+            display: flex;
+            gap: 20px;
+        }
+
+        /* 棋盤區域 */
+        .game-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .game-status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            color: #fff;
+            text-align: center;
+            min-width: 300px;
+        }
+
+        .game-status.waiting {
+            background: rgba(255, 193, 7, 0.2);
+            border: 2px solid #ffc107;
+        }
+
+        .game-status.playing {
+            background: rgba(76, 175, 80, 0.2);
+            border: 2px solid #4caf50;
+        }
+
+        .game-status.spectator {
+            background: rgba(33, 150, 243, 0.2);
+            border: 2px solid #2196f3;
+        }
+
+        .queue-status {
+            color: #ffc107;
+            font-size: 1.2rem;
+            margin: 20px 0;
+        }
+
+        .timer-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #e94560;
+            margin-top: 10px;
+        }
+
+        .countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .countdown-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .countdown-number {
+            font-size: 8rem;
+            color: #e94560;
+            font-weight: bold;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .player-info-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .player-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .player-card.active {
+            background: rgba(233, 69, 96, 0.3);
+            border: 2px solid #e94560;
+        }
+
+        .stone {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .stone.black {
+            background: radial-gradient(circle at 30% 30%, #555, #000);
+        }
+
+        .stone.white {
+            background: radial-gradient(circle at 30% 30%, #fff, #ccc);
+        }
+
+        .you-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: #4caf50;
+            color: white;
+        }
+
+        .game-container {
+            background: linear-gradient(145deg, #c9a66b, #a67c52);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(25, 20px);
+            grid-template-rows: repeat(25, 20px);
+            gap: 0;
+            background:
+                repeating-linear-gradient(to right, #333 0px, #333 1px, transparent 1px, transparent 20px),
+                repeating-linear-gradient(to bottom, #333 0px, #333 1px, transparent 1px, transparent 20px);
+            border: 2px solid #333;
+        }
+
+        .cell {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .cell.spectator {
+            cursor: not-allowed;
+        }
+
+        .cell:hover:not(.occupied) {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .piece {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            position: absolute;
+            z-index: 1;
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .piece.black {
+            background: radial-gradient(circle at 30% 30%, #555, #000);
+        }
+
+        .piece.white {
+            background: radial-gradient(circle at 30% 30%, #fff, #ccc);
+        }
+
+        .last-move {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #e94560;
+            border-radius: 50%;
+            z-index: 2;
+        }
+
+        /* 觀眾列表 */
+        .spectators-panel {
+            width: 180px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            color: #fff;
+        }
+
+        .spectators-panel h3 {
+            margin-bottom: 10px;
+            font-size: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 10px;
+        }
+
+        .player-list {
+            list-style: none;
+        }
+
+        .player-list li {
+            padding: 8px 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .player-list li:last-child {
+            border-bottom: none;
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 8px;
+            margin-left: auto;
+        }
+
+        .status-badge.waiting {
+            background: rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+        }
+
+        .status-badge.playing {
+            background: rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+        }
+
+        .status-badge.spectating {
+            background: rgba(33, 150, 243, 0.3);
+            color: #2196f3;
+        }
+
+        /* 聊天室 */
+        .chat-section {
+            width: 100%;
+            margin-top: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .chat-section h3 {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .chat-messages {
+            height: 120px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .chat-message {
+            color: #fff;
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+
+        .chat-input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input-group input {
+            flex: 1;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .chat-input-group button {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #e94560, #c73e54);
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .chat-input-group button:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 結果畫面 */
+        .result-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .result-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .result-box {
+            background: linear-gradient(145deg, #1a1a2e, #16213e);
+            padding: 40px 60px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(233, 69, 96, 0.3);
+        }
+
+        .result-text {
+            color: #fff;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .result-reason {
+            color: #aaa;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        .result-stone {
+            width: 60px;
+            height: 60px;
+            margin: 20px auto;
+            border-radius: 50%;
+            box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .result-stone.black {
+            background: radial-gradient(circle at 30% 30%, #555, #000);
+        }
+
+        .result-stone.white {
+            background: radial-gradient(circle at 30% 30%, #fff, #ccc);
+        }
+
+        .opponent-left {
+            color: #fff;
+            font-size: 1.5rem;
+            margin: 20px;
+        }
+
+        .disconnect-screen {
+            text-align: center;
+            color: #fff;
+        }
+
+        .disconnect-screen h2 {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>五子棋大廳</h1>
+
+    <!-- 登入畫面 -->
+    <div class="login-screen" id="loginScreen">
+        <h2>請輸入暱稱</h2>
+        <input type="text" id="nicknameInput" placeholder="暱稱 (2-20字)" maxlength="20">
+        <br>
+        <button id="loginBtn">進入大廳</button>
+    </div>
+
+    <!-- 大廳畫面 -->
+    <div class="lobby-screen" id="lobbyScreen">
+        <div class="lobby-header">
+            <h2>五子棋大廳</h2>
+            <div class="user-info">
+                <span style="color: #fff;">您好, <span id="userName">玩家</span></span>
+            </div>
+        </div>
+
+        <div class="lobby-content">
+            <div class="game-section">
+                <!-- 遊戲狀態 -->
+                <div class="game-status waiting" id="gameStatus">
+                    <div id="statusText">等待配對中...</div>
+                    <div class="queue-status" id="queueStatus"></div>
+                    <div class="timer-display" id="timerDisplay"></div>
+                </div>
+
+                <!-- 玩家資訊 -->
+                <div class="player-info-bar" id="playerInfoBar">
+                    <div class="player-card" id="playerCard1">
+                        <div class="stone black"></div>
+                        <span id="player1Name">等待中...</span>
+                        <span class="you-badge" id="youBadge1" style="display:none">你</span>
+                    </div>
+                    <div class="player-card" id="playerCard2">
+                        <div class="stone white"></div>
+                        <span id="player2Name">等待中...</span>
+                        <span class="you-badge" id="youBadge2" style="display:none">你</span>
+                    </div>
+                </div>
+
+                <!-- 棋盤 -->
+                <div class="game-container">
+                    <div class="board" id="board"></div>
+                </div>
+            </div>
+
+            <!-- 觀眾列表 -->
+            <div class="spectators-panel">
+                <h3>👥 觀眾名單</h3>
+                <ul class="player-list" id="playerList">
+                    <!-- 玩家列表會動態生成 -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- 聊天室 -->
+        <div class="chat-section">
+            <h3>💬 聊天室</h3>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-group">
+                <input type="text" id="chatInput" placeholder="輸入訊息..." maxlength="200">
+                <button id="sendChatBtn">發送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 倒數 -->
+    <div class="countdown-overlay" id="countdownOverlay">
+        <div class="countdown-number" id="countdownNumber">5</div>
+    </div>
+
+    <!-- 結果 -->
+    <div class="result-overlay" id="resultOverlay">
+        <div class="result-box">
+            <div class="result-text" id="resultText">遊戲結束</div>
+            <div class="result-reason" id="resultReason"></div>
+            <div class="result-stone" id="resultStone"></div>
+        </div>
+    </div>
+
+    <script>
+        const BOARD_SIZE = 25;
+        const EMPTY = 0;
+        const BLACK = 1;
+        const WHITE = 2;
+
+        let ws = null;
+        let myName = null;
+        let myColor = null;
+        let board = [];
+        let isSpectator = false;
+        let isPlaying = false;
+        let mySessionToken = localStorage.getItem('gomoku_session');
+
+        // DOM 元素
+        const loginScreen = document.getElementById('loginScreen');
+        const lobbyScreen = document.getElementById('lobbyScreen');
+        const nicknameInput = document.getElementById('nicknameInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const userName = document.getElementById('userName');
+        const gameStatus = document.getElementById('gameStatus');
+        const statusText = document.getElementById('statusText');
+        const queueStatus = document.getElementById('queueStatus');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const player1Name = document.getElementById('player1Name');
+        const player2Name = document.getElementById('player2Name');
+        const playerCard1 = document.getElementById('playerCard1');
+        const playerCard2 = document.getElementById('playerCard2');
+        const youBadge1 = document.getElementById('youBadge1');
+        const youBadge2 = document.getElementById('youBadge2');
+        const boardElement = document.getElementById('board');
+        const playerList = document.getElementById('playerList');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const countdownNumber = document.getElementById('countdownNumber');
+        const resultOverlay = document.getElementById('resultOverlay');
+        const resultText = document.getElementById('resultText');
+        const resultReason = document.getElementById('resultReason');
+        const resultStone = document.getElementById('resultStone');
+
+        // 連接 WebSocket
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                console.log('已連接伺服器');
+                // 嘗試恢復 session
+                if (mySessionToken) {
+                    ws.send(JSON.stringify({ type: 'restore_session', sessionToken: mySessionToken }));
+                }
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleMessage(msg);
+            };
+
+            ws.onclose = () => {
+                console.log('斷開連接');
+                alert('連接已斷開，請重新整理頁面');
+                location.reload();
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket錯誤:', error);
+            };
+        }
+
+        // 處理訊息
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'login_request':
+                    // 伺服器要求登入
+                    break;
+
+                case 'login_success':
+                    myName = msg.name;
+                    userName.textContent = myName;
+                    loginScreen.style.display = 'none';
+                    lobbyScreen.style.display = 'block';
+
+                    // 儲存 session token
+                    if (msg.sessionToken) {
+                        mySessionToken = msg.sessionToken;
+                        localStorage.setItem('gomoku_session', msg.sessionToken);
+                    }
+
+                    // 如果是恢復的 session，維持遊戲狀態
+                    if (msg.restored && msg.playerColor) {
+                        myColor = msg.playerColor;
+                        isPlaying = true;
+                        isSpectator = false;
+                        gameStatus.className = 'game-status playing';
+                        statusText.textContent = '對戰中！ (已恢復)';
+                    }
+                    break;
+
+                case 'error':
+                    alert(msg.message);
+                    break;
+
+                case 'queue_status':
+                    if (msg.count > 0) {
+                        queueStatus.textContent = `排隊人數: ${msg.count} 人`;
+                    } else {
+                        queueStatus.textContent = '';
+                    }
+                    break;
+
+                case 'player_list':
+                    updatePlayerList(msg.players);
+                    break;
+
+                case 'match_start':
+                    isSpectator = false;
+                    isPlaying = true;
+                    myColor = msg.playerColor;
+                    board = msg.board;
+                    updateGameUI(true, msg.opponentName);
+                    renderBoard();
+                    gameStatus.className = 'game-status playing';
+                    statusText.textContent = '對戰中！';
+                    break;
+
+                case 'spectate':
+                    isSpectator = true;
+                    isPlaying = false;
+                    board = msg.board;
+                    updateGameUI(false, msg.players[0], msg.players[1]);
+                    renderBoardSpectator();
+                    gameStatus.className = 'game-status spectator';
+                    statusText.textContent = msg.restored ? '觀戰中 (已恢復)' : '觀戰中';
+                    break;
+
+                case 'move':
+                    board[msg.row][msg.col] = msg.player;
+                    renderBoardWithLastMove(msg.row, msg.col);
+                    break;
+
+                case 'time_sync':
+                    timerDisplay.textContent = `剩餘時間: ${msg.remaining}秒`;
+                    break;
+
+                case 'countdown':
+                    countdownNumber.textContent = msg.count;
+                    countdownOverlay.classList.add('show');
+                    break;
+
+                case 'win':
+                    isPlaying = false;
+                    showResult(true, msg.winner);
+                    break;
+
+                case 'lose':
+                    isPlaying = false;
+                    showResult(false, msg.winner, msg.reason);
+                    break;
+
+                case 'game_end':
+                    showResultSpectator(msg.winner, msg.winnerName, msg.reason);
+                    break;
+
+                case 'timeout':
+                    isPlaying = false;
+                    showResult(false, msg.winner, msg.reason);
+                    break;
+
+                case 'opponent_left':
+                    isPlaying = false;
+                    showOpponentLeft();
+                    break;
+
+                case 'chat_broadcast':
+                    addChatMessage(msg.time, msg.name, msg.message);
+                    break;
+            }
+        }
+
+        // 登入
+        function login() {
+            const name = nicknameInput.value.trim();
+            if (name.length < 2 || name.length > 20) {
+                alert('暱稱需要2-20個字');
+                return;
+            }
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'login', name: name }));
+            }
+        }
+
+        // 更新玩家列表
+        function updatePlayerList(players) {
+            playerList.innerHTML = '';
+            players.forEach(p => {
+                const li = document.createElement('li');
+                let statusText = '';
+                let statusClass = '';
+
+                if (p.status === 'playing') {
+                    statusText = '對战中';
+                    statusClass = 'playing';
+                } else if (p.status === 'spectating') {
+                    statusText = '觀战中';
+                    statusClass = 'spectating';
+                } else {
+                    statusText = '等待中';
+                    statusClass = 'waiting';
+                }
+
+                li.innerHTML = `
+                    <span>👤 ${p.name}</span>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                `;
+                playerList.appendChild(li);
+            });
+        }
+
+        // 更新遊戲 UI
+        function updateGameUI(playing, opponentName, player1 = null, player2 = null) {
+            if (playing) {
+                player1Name.textContent = myName;
+                player2Name.textContent = opponentName;
+
+                if (myColor === BLACK) {
+                    youBadge1.style.display = 'inline';
+                    youBadge2.style.display = 'none';
+                } else {
+                    youBadge1.style.display = 'none';
+                    youBadge2.style.display = 'inline';
+                }
+            } else {
+                player1Name.textContent = player1 || '等待中...';
+                player2Name.textContent = player2 || '等待中...';
+                youBadge1.style.display = 'none';
+                youBadge2.style.display = 'none';
+            }
+        }
+
+        // 渲染棋盤（玩家視角）
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+
+                    if (board[row] && board[row][col] !== EMPTY) {
+                        const piece = document.createElement('div');
+                        piece.className = `piece ${board[row][col] === BLACK ? 'black' : 'white'}`;
+                        cell.appendChild(piece);
+                        cell.classList.add('occupied');
+                    }
+
+                    cell.addEventListener('click', () => handleClick(row, col));
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        // 渲染棋盤（觀眾視角）
+        function renderBoardSpectator() {
+            boardElement.innerHTML = '';
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell spectator';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+
+                    if (board[row] && board[row][col] !== EMPTY) {
+                        const piece = document.createElement('div');
+                        piece.className = `piece ${board[row][col] === BLACK ? 'black' : 'white'}`;
+                        cell.appendChild(piece);
+                        cell.classList.add('occupied');
+                    }
+
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        // 渲染棋盤並標記最後一步
+        function renderBoardWithLastMove(row, col) {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    if (board[r] && board[r][c] !== EMPTY) {
+                        const piece = document.createElement('div');
+                        piece.className = `piece ${board[r][c] === BLACK ? 'black' : 'white'}`;
+                        cell.appendChild(piece);
+                        cell.classList.add('occupied');
+
+                        // 標記最後一步
+                        if (r === row && c === col) {
+                            const lastMoveMarker = document.createElement('div');
+                            lastMoveMarker.className = 'last-move';
+                            cell.appendChild(lastMoveMarker);
+                        }
+                    }
+
+                    cell.addEventListener('click', () => handleClick(r, c));
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        // 處理點擊
+        function handleClick(row, col) {
+            if (isSpectator || !isPlaying) return;
+            if (!board[row] || board[row][col] !== EMPTY) return;
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'move',
+                    row: row,
+                    col: col
+                }));
+            }
+        }
+
+        // 顯示結果
+        function showResult(win, winner, reason = '') {
+            if (win) {
+                resultText.textContent = '你獲勝！';
+                resultText.style.color = '#4caf50';
+            } else {
+                resultText.textContent = '你落敗了';
+                resultText.style.color = '#e94560';
+            }
+
+            resultReason.textContent = reason || (win ? '恭喜獲勝！' : '再接再厲！');
+            resultStone.className = `result-stone ${winner === BLACK ? 'black' : 'white'}`;
+            resultOverlay.classList.add('show');
+
+            setTimeout(() => {
+                resultOverlay.classList.remove('show');
+                gameStatus.className = 'game-status waiting';
+                statusText.textContent = '等待配對中...';
+                timerDisplay.textContent = '';
+                queueStatus.textContent = '';
+            }, 3000);
+        }
+
+        // 顯示觀眾視角的結果
+        function showResultSpectator(winner, winnerName, reason) {
+            resultText.textContent = `${winnerName} 獲勝！`;
+            resultText.style.color = '#4caf50';
+            resultReason.textContent = reason;
+            resultStone.className = `result-stone ${winner === BLACK ? 'black' : 'white'}`;
+            resultOverlay.classList.add('show');
+
+            setTimeout(() => {
+                resultOverlay.classList.remove('show');
+            }, 3000);
+        }
+
+        // 對手離開
+        function showOpponentLeft() {
+            resultText.textContent = '對手已離開';
+            resultText.style.color = '#ffc107';
+            resultReason.textContent = '遊戲結束';
+            resultStone.style.display = 'none';
+            resultOverlay.classList.add('show');
+
+            setTimeout(() => {
+                resultOverlay.classList.remove('show');
+                resultStone.style.display = 'block';
+                gameStatus.className = 'game-status waiting';
+                statusText.textContent = '等待配對中...';
+            }, 3000);
+        }
+
+        // 聊天
+        function sendChat() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'chat', message: message }));
+            }
+            chatInput.value = '';
+        }
+
+        // 顯示聊天訊息
+        function addChatMessage(time, name, message) {
+            const div = document.createElement('div');
+            div.className = 'chat-message';
+            div.textContent = `[${time}][${name}]: ${message}`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // 事件監聽
+        loginBtn.addEventListener('click', login);
+        nicknameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+
+        sendChatBtn.addEventListener('click', sendChat);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+
+        // 初始化
+        connect();
+    </script>
+</body>
+</html>

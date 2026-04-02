@@ -1,0 +1,12 @@
+{
+  "name": "gomoku-online",
+  "version": "1.0.0",
+  "description": "五子棋連線對戰",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
+  }
+}

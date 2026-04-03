@@ -7,6 +7,7 @@ const SessionManager = require('./models/SessionManager');
 const PlayerStatus = require('./enums/PlayerStatus');
 const TimerManager = require('./TimerManager');
 const MessageHandler = require('./MessageHandler');
+const RateLimiter = require('./core/RateLimiter');
 
 const PORT = 3000;
 
@@ -24,6 +25,8 @@ class GameServer {
         this.wss = null;
         this.server = null;
         this.players = new Map(); // ws -> Player
+        this.ipConnections = new Map(); // ip -> count
+        this.maxConnectionsPerIP = 5;
 
         // Core components
         this.sessionManager = new SessionManager();
@@ -33,6 +36,9 @@ class GameServer {
 
         // Chat cooldown tracking
         this.lastChatTime = new Map(); // ws -> timestamp
+
+        // Rate limiting
+        this.rateLimiter = new RateLimiter({ maxMessages: 30, windowMs: 1000 });
 
         this._setupTimers();
     }
@@ -81,6 +87,11 @@ class GameServer {
                 client.ping();
             });
         }, 30000, 'heartbeat');
+
+        // Rate limiter cleanup - every minute
+        this.timerManager.addInterval(() => {
+            this.rateLimiter.cleanup();
+        }, 60000, 'rate_limiter_cleanup');
     }
 
     start() {
@@ -132,6 +143,17 @@ class GameServer {
             || req.socket.remoteAddress
             || 'unknown';
 
+        // Check connection limit per IP
+        const currentCount = this.ipConnections.get(clientIP) || 0;
+        if (currentCount >= this.maxConnectionsPerIP) {
+            this.log(`拒絕連線 from ${clientIP}: 超過最大連線數 (${this.maxConnectionsPerIP})`);
+            ws.close(1008, 'Too many connections from this IP');
+            return;
+        }
+
+        // Increment connection count
+        this.ipConnections.set(clientIP, currentCount + 1);
+
         const player = new Player(playerId, ws, clientIP);
         this.players.set(ws, player);
 
@@ -150,6 +172,13 @@ class GameServer {
     }
 
     _handleMessage(ws, data) {
+        // Check rate limit
+        if (!this.rateLimiter.check(ws)) {
+            this.log(`訊息頻率過高，斷開客戶端`);
+            ws.close(1008, 'Rate limit exceeded');
+            return;
+        }
+
         try {
             const message = JSON.parse(data);
             this.messageHandler.handle(ws, message);
@@ -167,11 +196,24 @@ class GameServer {
         // Handle player leaving queue/game
         this.gameRoom.handlePlayerDisconnect(ws);
 
+        // Decrement IP connection count
+        if (player.ip) {
+            const count = this.ipConnections.get(player.ip) || 1;
+            if (count <= 1) {
+                this.ipConnections.delete(player.ip);
+            } else {
+                this.ipConnections.set(player.ip, count - 1);
+            }
+        }
+
         // Remove player
         this.players.delete(ws);
 
         // Clean up chat time
         this.lastChatTime.delete(ws);
+
+        // Clean up rate limiter
+        this.rateLimiter.remove(ws);
 
         // Set session to expire
         this.sessionManager.setExpiring(player);

@@ -1,5 +1,7 @@
 const PlayerStatus = require('./enums/PlayerStatus');
 const Game = require('./models/Game');
+const { sanitizeHtml } = require('./utils/sanitize');
+const { BOARD_SIZE } = require('./utils/gameLogic');
 
 /**
  * Handles all WebSocket message processing
@@ -49,7 +51,8 @@ class MessageHandler {
     }
 
     _handleLogin(ws, player, message) {
-        const name = (message.name || '').trim().substring(0, 20);
+        const rawName = (message.name || '').trim().substring(0, 20);
+        const name = sanitizeHtml(rawName);
 
         if (name.length < 2) {
             this.gameServer.send(ws, { type: 'error', message: '暱稱需要2-20個字' });
@@ -179,12 +182,27 @@ class MessageHandler {
         const game = this.gameRoom.getGameByPlayer(ws);
         if (!game || game.gameOver) return;
 
-        const { row, col } = message;
+        const row = message.row;
+        const col = message.col;
+
+        // Validate coordinate types
+        if (!Number.isInteger(row) || !Number.isInteger(col)) {
+            this.gameServer.send(ws, { type: 'error', message: '無效的座標格式' });
+            return;
+        }
+
+        // Validate coordinate range
+        if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
+            this.gameServer.send(ws, { type: 'error', message: '座標超出棋盤範圍' });
+            return;
+        }
+
         this.gameRoom.handleMove(game, ws, row, col);
     }
 
     _handleChat(ws, player, message) {
-        const chatMsg = (message.message || '').trim().substring(0, 200);
+        const rawMsg = (message.message || '').trim().substring(0, 200);
+        const chatMsg = sanitizeHtml(rawMsg);
         if (!chatMsg || !player.name) return;
 
         const lastMsgTime = this.gameServer.lastChatTime.get(ws) || 0;
@@ -201,11 +219,10 @@ class MessageHandler {
             type: 'chat_broadcast',
             time: timeStr,
             name: player.name,
-            message: chatMsg,
-            ip: player.ip
+            message: chatMsg
         });
 
-        this.gameServer.log(`[聊天] ${player.name} (${player.ip}): ${chatMsg}`);
+        this.gameServer.log(`[聊天] ${player.name}: ${chatMsg}`);
     }
 
     _handleGetUserInfo(ws, player) {

@@ -1,4 +1,5 @@
 const WebSocket = require('ws');
+const crypto = require('crypto');
 const Game = require('./Game');
 const PlayerStatus = require('../enums/PlayerStatus');
 
@@ -7,8 +8,16 @@ class GameRoom {
         this.gameServer = gameServer;
         this.games = new Map(); // gameId -> Game
         this.matchmakingQueue = new Set(); // Set of Player
-        this.gameIdCounter = 1;
         this.countdownTimer = null;
+        this.maxQueueSize = 100;
+    }
+
+    /**
+     * Generate a unique game ID
+     * @returns {string} - Unique game ID
+     */
+    _generateGameId() {
+        return 'g_' + crypto.randomUUID();
     }
 
     addToQueue(player) {
@@ -19,6 +28,16 @@ class GameRoom {
 
         if (player.status !== PlayerStatus.WAITING) {
             console.log('[GameRoom] addToQueue failed - wrong status:', player.status)
+            return false;
+        }
+
+        // Check queue limit
+        if (this.matchmakingQueue.size >= this.maxQueueSize) {
+            this.gameServer.log(`排隊人數已滿，無法加入排隊`);
+            player.setStatus(PlayerStatus.SPECTATING);
+            if (player.ws) {
+                this.gameServer.send(player.ws, { type: 'error', message: '排隊人數已滿，請稍後再試' });
+            }
             return false;
         }
 
@@ -88,7 +107,8 @@ class GameRoom {
     }
 
     createGame(player1, player2) {
-        const game = new Game(this.gameIdCounter++, player1, player2);
+        const gameId = this._generateGameId();
+        const game = new Game(gameId, player1, player2);
 
         player1.setStatus(PlayerStatus.PLAYING);
         player1.setGameId(game.id);

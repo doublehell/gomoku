@@ -1,4 +1,6 @@
 // Game constants
+const crypto = require('crypto');
+
 const BOARD_SIZE = 15;
 const EMPTY = 0;
 const BLACK = 1;
@@ -51,7 +53,7 @@ function checkWin(board, row, col, player) {
  * @returns {string} - Session token
  */
 function generateSessionToken() {
-    return 's_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+    return 's_' + crypto.randomUUID();
 }
 
 /**

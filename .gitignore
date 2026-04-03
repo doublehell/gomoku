@@ -26,3 +26,7 @@ build/
 
 # Claude Code (local settings)
 .claude/
+
+# Worktrees
+.worktrees/
+worktrees/

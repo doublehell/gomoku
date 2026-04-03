@@ -19,7 +19,6 @@ export interface ChatMessage {
   time: string
   name: string
   message: string
-  ip: string
 }
 
 // Player info
@@ -155,7 +154,6 @@ export interface ChatBroadcast {
   time: string
   name: string
   message: string
-  ip: string
 }
 
 // Opponent left

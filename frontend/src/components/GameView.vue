@@ -92,8 +92,7 @@ function handleChatBroadcast(msg: any) {
   chatStore.addMessage({
     time: msg.time,
     name: msg.name,
-    message: msg.message,
-    ip: msg.ip
+    message: msg.message
   })
 }
 
